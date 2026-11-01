@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stack Pulse - Precision Timing Mini-Game</title>
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --panel-bg: rgba(15, 23, 42, 0.75);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .game-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      height: 94vh;
+      max-height: 680px;
+      background: #090d16;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--panel-border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .score-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .score-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+    .current-score {
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 1;
+      color: #ffffff;
+      text-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+      transition: transform 0.15s ease-out;
+    }
+    .current-score.pop {
+      transform: scale(1.18);
+    }
+    .hud-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .hud-badge {
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--panel-border);
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .hud-badge strong {
+      color: #ffffff;
+    }
+    .icon-btn {
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+    .combo-indicator {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      background: linear-gradient(90deg, #f59e0b, #ec4899);
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+      opacity: 0;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .combo-indicator.visible {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+    .overlay-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(7, 10, 19, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+      padding: 24px;
+      text-align: center;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .overlay-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .modal-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+    .modal-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .stat-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 12px 10px;
+      border-radius: 12px;
+    }
+    .stat-box-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .stat-box-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .play-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+      border: none;
+      border-radius: 14px;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: 0 8px 20px -4px rgba(14, 165, 233, 0.5);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .play-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px -4px rgba(14, 165, 233, 0.6);
+    }
+    .play-btn:active {
+      transform: scale(0.97);
+    }
+    .tap-hint {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tap-hint kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="game-wrapper">
+    <!-- Heads-Up Display -->
+    <div class="hud">
+      <div class="score-container">
+        <span class="score-label">Score</span>
+        <div id="score" class="current-score">0</div>
+      </div>
+      <div class="hud-badges">
+        <div class="hud-badge">
+          <span>BEST</span>
+          <strong id="high-score">0</strong>
+        </div>
+        <button id="mute-btn" class="icon-btn" title="Toggle Sound">
+          <svg id="sound-icon-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="sound-icon-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Combo Streak Pill -->
+    <div id="combo-pill" class="combo-indicator">COMBO x2</div>
+
+    <!-- HTML5 Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Start Screen Overlay -->
+    <div id="start-overlay" class="overlay-screen">
+      <div class="modal-card">
+        <h1 class="modal-title">STACK PULSE</h1>
+        <p class="modal-subtitle">Addictive Precision Timing Game</p>
+        <button id="start-btn" class="play-btn">START GAME</button>
+        <div class="tap-hint">
+          <span>Click, Tap or press</span>
+          <kbd>Space</kbd>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen Overlay -->
+    <div id="gameover-overlay" class="overlay-screen hidden">
+      <div class="modal-card">
+        <h2 class="modal-title">GAME OVER</h2>
+        <p class="modal-subtitle">Stack tumbled off the edge!</p>
+
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-box-label">Final Score</div>
+            <div id="final-score" class="stat-box-val">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-label">Best Score</div>
+            <div id="modal-best-score" class="stat-box-val">0</div>
+          </div>
+        </div>
+
+        <button id="restart-btn" class="play-btn">PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       SoundController - Synthesized Web Audio API Engine
+       ========================================================================== */
+    class SoundController {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+        this.scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) this.ctx = new AudioContextClass();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        return this.isMuted;
+      }
+
+      playSlice() {
+        if (this.isMuted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      }
+
+      playPerfect(combo) {
+        if (this.isMuted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const index = Math.min(Math.max(0, combo - 1), this.scale.length - 1);
+        const baseFreq = this.scale[index];
+
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(baseFreq, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc1.connect(gain1);
+        gain1.connect(this.ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.45);
+
+        const osc2 = this.ctx.createOscillator();
+        const gain2 = this.ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(baseFreq * 2, now);
+        gain2.gain.setValueAtTime(0.12, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc2.connect(gain2);
+        gain2.connect(this.ctx.destination);
+        osc2.start(now);
+        osc2.stop(now + 0.3);
+
+        if (combo >= 5) {
+          const osc3 = this.ctx.createOscillator();
+          const gain3 = this.ctx.createGain();
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(baseFreq * 1.5, now + 0.04);
+          gain3.gain.setValueAtTime(0.15, now + 0.04);
+          gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc3.connect(gain3);
+          gain3.connect(this.ctx.destination);
+          osc3.start(now + 0.04);
+          osc3.stop(now + 0.35);
+        }
+      }
+
+      playBonus() {
+        if (this.isMuted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.06);
+          gain.gain.setValueAtTime(0.2, now + i * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.06);
+          osc.stop(now + i * 0.06 + 0.25);
+        });
+      }
+
+      playGameOver() {
+        if (this.isMuted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.7);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(400, now);
+        filter.frequency.exponentialRampToValueAtTime(60, now + 0.7);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.7);
+      }
+    }
+
+    /* ==========================================================================
+       Particles & Physics System
+       ========================================================================== */
+    class SparkParticle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = -Math.random() * 4 - 1;
+        this.gravity = 0.22;
+        this.size = Math.random() * 3 + 2;
+        this.color = color;
+        this.alpha = 1;
+        this.decay = Math.random() * 0.03 + 0.02;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.alpha -= this.decay;
+        return this.alpha > 0;
+      }
+      draw(ctx, cameraY) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y + cameraY, this.size, this.size);
+        ctx.restore();
+      }
+    }
+
+    class DebrisBlock {
+      constructor(x, y, width, height, color, direction) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = color;
+        this.vx = direction * (Math.random() * 1.5 + 1.2);
+        this.vy = -1.5;
+        this.gravity = 0.55;
+        this.angle = 0;
+        this.angularVelocity = direction * (Math.random() * 0.05 + 0.03);
+        this.alpha = 1;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.angle += this.angularVelocity;
+        if (this.vy > 6) this.alpha -= 0.02;
+        return this.alpha > 0;
+      }
+      draw(ctx, cameraY) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + cameraY + this.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, 3);
+        ctx.restore();
+      }
+    }
+
+    class Shockwave {
+      constructor(x, y, width, height, color) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = color;
+        this.scale = 1;
+        this.alpha = 1;
+        this.expansionRate = 0.08;
+        this.decay = 0.04;
+      }
+      update() {
+        this.scale += this.expansionRate;
+        this.alpha -= this.decay;
+        return this.alpha > 0;
+      }
+      draw(ctx, cameraY) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 12;
+        const w = this.width * this.scale;
+        const h = this.height * (1 + (this.scale - 1) * 0.5);
+        const x = this.x - (w - this.width) / 2;
+        const y = this.y + cameraY - (h - this.height) / 2;
+        ctx.strokeRect(x, y, w, h);
+        ctx.restore();
+      }
+    }
+
+    class FloatingText {
+      constructor(x, y, text, color, scale = 1) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.scale = scale;
+        this.alpha = 1;
+        this.vy = -1.6;
+      }
+      update() {
+        this.y += this.vy;
+        this.alpha -= 0.022;
+        return this.alpha > 0;
+      }
+      draw(ctx, cameraY) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.font = `bold ${Math.round(18 * this.scale)}px 'Inter', system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(this.text, this.x, this.y + cameraY);
+        ctx.restore();
+      }
+    }
+
+    class EffectManager {
+      constructor() {
+        this.sparks = [];
+        this.debris = [];
+        this.shockwaves = [];
+        this.floatingTexts = [];
+      }
+      createSparks(x, y, count, color) {
+        for (let i = 0; i < count; i++) this.sparks.push(new SparkParticle(x, y, color));
+      }
+      createDebris(x, y, width, height, color, direction) {
+        this.debris.push(new DebrisBlock(x, y, width, height, color, direction));
+      }
+      createShockwave(x, y, width, height, color) {
+        this.shockwaves.push(new Shockwave(x, y, width, height, color));
+      }
+      createFloatingText(x, y, text, color, scale = 1) {
+        this.floatingTexts.push(new FloatingText(x, y, text, color, scale));
+      }
+      update() {
+        this.sparks = this.sparks.filter(s => s.update());
+        this.debris = this.debris.filter(d => d.update());
+        this.shockwaves = this.shockwaves.filter(w => w.update());
+        this.floatingTexts = this.floatingTexts.filter(t => t.update());
+      }
+      draw(ctx, cameraY) {
+        this.debris.forEach(d => d.draw(ctx, cameraY));
+        this.shockwaves.forEach(w => w.draw(ctx, cameraY));
+        this.sparks.forEach(s => s.draw(ctx, cameraY));
+        this.floatingTexts.forEach(t => t.draw(ctx, cameraY));
+      }
+      clear() {
+        this.sparks = [];
+        this.debris = [];
+        this.shockwaves = [];
+        this.floatingTexts = [];
+      }
+    }
+
+    /* ==========================================================================
+       Stack Tower Game Engine
+       ========================================================================== */
+    class Game {
+      constructor(canvas, uiCallbacks = {}) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.ui = uiCallbacks;
+
+        this.width = 420;
+        this.height = 640;
+        this.blockHeight = 26;
+        this.initialWidth = 200;
+
+        this.audio = new SoundController();
+        this.effects = new EffectManager();
+        this.highScore = parseInt(localStorage.getItem('stack_tower_high_score') || '0', 10);
+
+        this.state = 'START';
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = 0;
+        this.baseHue = 200;
+
+        this.cameraY = 0;
+        this.targetCameraY = 0;
+        this.shakeIntensity = 0;
+        this.stack = [];
+        this.activeBlock = null;
+
+        this.setupResolution();
+        this.bindEvents();
+        this.reset();
+
+        this.lastTime = performance.now();
+        this.loop = this.loop.bind(this);
+        requestAnimationFrame(this.loop);
+      }
+
+      setupResolution() {
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = this.width * dpr;
+        this.canvas.height = this.height * dpr;
+        this.ctx.scale(dpr, dpr);
+      }
+
+      bindEvents() {
+        const handleAction = (e) => {
+          if (e.type === 'touchstart') e.preventDefault();
+          this.handleClickOrTap();
+        };
+        this.canvas.addEventListener('pointerdown', handleAction);
+        window.addEventListener('keydown', (e) => {
+          if (e.code === 'Space' || e.code === 'ArrowDown') {
+            e.preventDefault();
+            this.handleClickOrTap();
+          }
+        });
+        window.addEventListener('resize', () => this.setupResolution());
+      }
+
+      getColor(level) {
+        const hue = (this.baseHue + level * 6) % 360;
+        return `hsl(${hue}, 85%, 62%)`;
+      }
+
+      getTopFaceColor(level) {
+        const hue = (this.baseHue + level * 6) % 360;
+        return `hsl(${hue}, 90%, 75%)`;
+      }
+
+      reset() {
+        this.score = 0;
+        this.combo = 0;
+        this.cameraY = 0;
+        this.targetCameraY = 0;
+        this.shakeIntensity = 0;
+        this.baseHue = Math.floor(Math.random() * 360);
+        this.effects.clear();
+
+        const startY = this.height - 110;
+        const startX = (this.width - this.initialWidth) / 2;
+
+        this.stack = [{
+          x: startX,
+          y: startY,
+          width: this.initialWidth,
+          height: this.blockHeight,
+          color: this.getColor(0),
+          topColor: this.getTopFaceColor(0)
+        }];
+
+        this.spawnNextBlock();
+        this.state = 'START';
+        if (this.ui.onScoreUpdate) this.ui.onScoreUpdate(0, this.highScore, 0);
+      }
+
+      spawnNextBlock() {
+        const prev = this.stack[this.stack.length - 1];
+        const level = this.stack.length;
+        const y = prev.y - this.blockHeight;
+        const direction = level % 2 === 0 ? 1 : -1;
+        const speed = 3.6 + Math.min(level * 0.14, 6.2);
+        const x = direction === 1 ? -prev.width : this.width;
+
+        this.activeBlock = {
+          x,
+          y,
+          width: prev.width,
+          height: this.blockHeight,
+          speed,
+          direction,
+          color: this.getColor(level),
+          topColor: this.getTopFaceColor(level)
+        };
+      }
+
+      handleClickOrTap() {
+        this.audio.init();
+        if (this.state === 'START') {
+          this.state = 'PLAYING';
+          return;
+        }
+        if (this.state === 'GAMEOVER') {
+          this.reset();
+          this.state = 'PLAYING';
+          return;
+        }
+        if (this.state === 'PLAYING') {
+          this.placeBlock();
+        }
+      }
+
+      placeBlock() {
+        const curr = this.activeBlock;
+        const prev = this.stack[this.stack.length - 1];
+        const diff = curr.x - prev.x;
+        const perfectThreshold = 3.5;
+
+        // PERFECT MATCH
+        if (Math.abs(diff) <= perfectThreshold) {
+          curr.x = prev.x;
+          this.combo++;
+          if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+
+          const comboBonus = this.combo * 2;
+          this.score += 1 + comboBonus;
+          this.audio.playPerfect(this.combo);
+
+          this.effects.createShockwave(curr.x, curr.y, curr.width, curr.height, curr.color);
+          this.effects.createFloatingText(
+            curr.x + curr.width / 2,
+            curr.y - 12,
+            this.combo > 1 ? `PERFECT x${this.combo}! (+${comboBonus + 1})` : 'PERFECT! (+3)',
+            '#facc15',
+            1.1
+          );
+
+          if (this.combo >= 5 && curr.width < this.initialWidth) {
+            const bonusWidth = Math.min(12, this.initialWidth - curr.width);
+            curr.width += bonusWidth;
+            curr.x = Math.max(10, curr.x - bonusWidth / 2);
+            this.audio.playBonus();
+            this.effects.createFloatingText(
+              curr.x + curr.width / 2,
+              curr.y - 32,
+              'EXPANDED! ⚡',
+              '#38bdf8',
+              1.2
+            );
+          }
+
+          this.stack.push({ ...curr });
+          this.onSuccessfulPlacement();
+          return;
+        }
+
+        // COMPLETE MISS
+        const hasOverlap = curr.x + curr.width > prev.x && curr.x < prev.x + prev.width;
+        if (!hasOverlap) {
+          const direction = curr.x > prev.x ? 1 : -1;
+          this.effects.createDebris(curr.x, curr.y, curr.width, curr.height, curr.color, direction);
+          this.activeBlock = null;
+          this.triggerGameOver();
+          return;
+        }
+
+        // SLICE BLOCK OVERHANG
+        this.combo = 0;
+        this.score += 1;
+        this.audio.playSlice();
+
+        let newWidth;
+        let placedX;
+
+        if (diff > 0) {
+          const overhangWidth = (curr.x + curr.width) - (prev.x + prev.width);
+          newWidth = curr.width - overhangWidth;
+          placedX = curr.x;
+          const debrisX = prev.x + prev.width;
+          this.effects.createDebris(debrisX, curr.y, overhangWidth, curr.height, curr.color, 1);
+          this.effects.createSparks(debrisX, curr.y + curr.height / 2, 12, curr.color);
+        } else {
+          const overhangWidth = prev.x - curr.x;
+          newWidth = curr.width - overhangWidth;
+          placedX = prev.x;
+          const debrisX = curr.x;
+          this.effects.createDebris(debrisX, curr.y, overhangWidth, curr.height, curr.color, -1);
+          this.effects.createSparks(debrisX + overhangWidth, curr.y + curr.height / 2, 12, curr.color);
+        }
+
+        curr.x = placedX;
+        curr.width = newWidth;
+        this.stack.push({ ...curr });
+        this.onSuccessfulPlacement();
+      }
+
+      onSuccessfulPlacement() {
+        const targetYOffset = Math.max(0, (this.stack.length - 8) * this.blockHeight);
+        this.targetCameraY = targetYOffset;
+
+        if (this.score > this.highScore) {
+          this.highScore = this.score;
+          localStorage.setItem('stack_tower_high_score', this.highScore.toString());
+        }
+
+        if (this.ui.onScoreUpdate) {
+          this.ui.onScoreUpdate(this.score, this.highScore, this.combo);
+        }
+
+        this.spawnNextBlock();
+      }
+
+      triggerGameOver() {
+        this.state = 'GAMEOVER';
+        this.shakeIntensity = 12;
+        this.audio.playGameOver();
+
+        if (this.ui.onGameOver) {
+          this.ui.onGameOver(this.score, this.highScore, this.maxCombo);
+        }
+      }
+
+      update(dt) {
+        this.cameraY += (this.targetCameraY - this.cameraY) * 0.1;
+
+        if (this.shakeIntensity > 0) {
+          this.shakeIntensity *= 0.88;
+          if (this.shakeIntensity < 0.1) this.shakeIntensity = 0;
+        }
+
+        if (this.state === 'PLAYING' && this.activeBlock) {
+          const b = this.activeBlock;
+          b.x += b.direction * b.speed;
+
+          const maxRight = this.width + 30;
+          const minLeft = -b.width - 30;
+
+          if (b.x + b.width >= maxRight) {
+            b.x = maxRight - b.width;
+            b.direction = -1;
+          } else if (b.x <= minLeft) {
+            b.x = minLeft;
+            b.direction = 1;
+          }
+        }
+
+        this.effects.update();
+      }
+
+      render() {
+        const ctx = this.ctx;
+        ctx.save();
+
+        if (this.shakeIntensity > 0) {
+          const shakeX = (Math.random() - 0.5) * this.shakeIntensity;
+          const shakeY = (Math.random() - 0.5) * this.shakeIntensity;
+          ctx.translate(shakeX, shakeY);
+        }
+
+        const bgHue = (this.baseHue + this.score * 3) % 360;
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, this.height);
+        bgGrad.addColorStop(0, `hsl(${bgHue}, 35%, 11%)`);
+        bgGrad.addColorStop(1, `hsl(${(bgHue + 30) % 360}, 40%, 6%)`);
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+        ctx.lineWidth = 1;
+        for (let y = (this.cameraY % 40); y < this.height; y += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(this.width, y);
+          ctx.stroke();
+        }
+
+        for (let i = 0; i < this.stack.length; i++) {
+          const b = this.stack[i];
+          const renderY = b.y + this.cameraY;
+          if (renderY > this.height + 40) continue;
+          this.drawBlock(ctx, b.x, renderY, b.width, b.height, b.color, b.topColor);
+        }
+
+        if (this.activeBlock) {
+          const b = this.activeBlock;
+          const renderY = b.y + this.cameraY;
+          this.drawBlock(ctx, b.x, renderY, b.width, b.height, b.color, b.topColor, true);
+        }
+
+        this.effects.draw(ctx, this.cameraY);
+        ctx.restore();
+      }
+
+      drawBlock(ctx, x, y, width, height, color, topColor, isActive = false) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, width, height);
+
+        ctx.shadowColor = 'transparent';
+        ctx.fillStyle = topColor || 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(x, y, width, 3.5);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillRect(x, y + height - 3, width, 3);
+
+        if (isActive && this.combo >= 3) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x, y, width, height);
+        }
+        ctx.restore();
+      }
+
+      loop(timestamp) {
+        const dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+        this.update(dt);
+        this.render();
+        requestAnimationFrame(this.loop);
+      }
+    }
+
+    // Initialize UI and Game
+    const canvas = document.getElementById('gameCanvas');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('high-score');
+    const finalScoreEl = document.getElementById('final-score');
+    const modalBestScoreEl = document.getElementById('modal-best-score');
+    const comboPillEl = document.getElementById('combo-pill');
+    const startOverlay = document.getElementById('start-overlay');
+    const gameOverOverlay = document.getElementById('gameover-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const soundIconOn = document.getElementById('sound-icon-on');
+    const soundIconOff = document.getElementById('sound-icon-off');
+
+    const game = new Game(canvas, {
+      onScoreUpdate: (score, highScore, combo) => {
+        scoreEl.innerText = score;
+        highScoreEl.innerText = highScore;
+
+        scoreEl.classList.remove('pop');
+        void scoreEl.offsetWidth;
+        scoreEl.classList.add('pop');
+
+        if (combo >= 2) {
+          comboPillEl.innerText = `COMBO x${combo}!`;
+          comboPillEl.classList.add('visible');
+        } else {
+          comboPillEl.classList.remove('visible');
+        }
+      },
+      onGameOver: (finalScore, highScore, maxCombo) => {
+        finalScoreEl.innerText = finalScore;
+        modalBestScoreEl.innerText = highScore;
+        comboPillEl.classList.remove('visible');
+        gameOverOverlay.classList.remove('hidden');
+      }
+    });
+
+    startBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startOverlay.classList.add('hidden');
+      game.handleClickOrTap();
+    });
+
+    restartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gameOverOverlay.classList.add('hidden');
+      game.handleClickOrTap();
+    });
+
+    muteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isMuted = game.audio.toggleMute();
+      soundIconOn.style.display = isMuted ? 'none' : 'block';
+      soundIconOff.style.display = isMuted ? 'block' : 'none';
+    });
+
+    window.addEventListener('pointerdown', (e) => {
+      if (!startOverlay.classList.contains('hidden') && !e.target.closest('#mute-btn')) {
+        startOverlay.classList.add('hidden');
+      }
+      if (!gameOverOverlay.classList.contains('hidden') && !e.target.closest('#mute-btn')) {
+        gameOverOverlay.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
